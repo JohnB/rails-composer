@@ -1659,34 +1659,35 @@ if prefs[:rvmrc]
       ENV['GEM_PATH'] = "#{gems_path}:#{gems_path}@global"
       require 'rvm'
       RVM.use_from_path! File.dirname(File.dirname(__FILE__))
-    rescue LoadError
-      raise "RVM gem is currently unavailable."
+
+      say_wizard "creating RVM gemset '#{app_name}'"
+      RVM.gemset_create app_name
+      run "rvm rvmrc trust"
+      say_wizard "switching to gemset '#{app_name}'"
+      # RVM.gemset_use! requires rvm version 1.11.3.5 or newer
+      rvm_spec =
+        if Gem::Specification.respond_to?(:find_by_name)
+          Gem::Specification.find_by_name("rvm")
+        else
+          Gem.source_index.find_name("rvm").last
+        end
+        unless rvm_spec.version > Gem::Version.create('1.11.3.4')
+          say_wizard "rvm gem version: #{rvm_spec.version}"
+          raise "Please update rvm gem to 1.11.3.5 or newer"
+        end
+      begin
+        RVM.gemset_use! app_name
+        run "rvm gemset list"
+        copy_from_repo '.rvmrc'
+        gsub_file '.rvmrc', /App_Name/, "#{app_name}"
+      rescue => e
+        say_wizard "rvm failure: unable to use gemset #{app_name}, reason: #{e}"
+        raise
+      end
+    rescue => e
+      puts "***\n*** OOPS! RVM gem is currently unavailable - not creating gemset.\n***"
     end
   end
-  say_wizard "creating RVM gemset '#{app_name}'"
-  RVM.gemset_create app_name
-  run "rvm rvmrc trust"
-  say_wizard "switching to gemset '#{app_name}'"
-  # RVM.gemset_use! requires rvm version 1.11.3.5 or newer
-  rvm_spec =
-    if Gem::Specification.respond_to?(:find_by_name)
-      Gem::Specification.find_by_name("rvm")
-    else
-      Gem.source_index.find_name("rvm").last
-    end
-    unless rvm_spec.version > Gem::Version.create('1.11.3.4')
-      say_wizard "rvm gem version: #{rvm_spec.version}"
-      raise "Please update rvm gem to 1.11.3.5 or newer"
-    end
-  begin
-    RVM.gemset_use! app_name
-  rescue => e
-    say_wizard "rvm failure: unable to use gemset #{app_name}, reason: #{e}"
-    raise
-  end
-  run "rvm gemset list"
-  copy_from_repo '.rvmrc'
-  gsub_file '.rvmrc', /App_Name/, "#{app_name}"
 end
 
 ## AFTER_EVERYTHING
